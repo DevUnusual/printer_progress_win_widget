@@ -26,11 +26,11 @@ pip install pystray pillow requests
 Executar o script:
 ### Windows
 ```bash
-python main.py
+python monitor.py
 ```
 ### Linux
 ```bash
-python3 main.py
+python3 monitor.py
 ```
 
 ## Inicializar junto ao sistema:
