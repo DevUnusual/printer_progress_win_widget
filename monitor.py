@@ -13,7 +13,7 @@ logging.basicConfig(
 
 def main():
     # URL da API para obter o progresso porta 4409, nao sei se funciona no fluid, possivelmente sim
-    API_URL = "http://<PRINTER IP MAINSAIL>:4409/printer/objects/query?virtual_sdcard=progress"
+    API_URL = "http://192.168.31.92:4409/printer/objects/query?virtual_sdcard=progress"
     stop_requested = False  # Variável para controlar o loop
 
     # Define a função para encerrar o loop
