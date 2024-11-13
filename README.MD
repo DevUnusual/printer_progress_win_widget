@@ -44,6 +44,7 @@ pyinstaller --onefile --noconsole monitor.py
 ```
 feito isso vai ser gerado um executável na pasta "dist" com o nome "monitor.exe"
 abrir o task scheduler e criar uma nova tarefa com o trigger "at startup" e na aba "actions" adicionar o caminho do executável gerado.
+obs: no task scheduler ao inserir o caminho coloque entre aspas duplas.
 
 ## Inicializar junto ao sistema (Só com script [não consegui]):
 ### Windows:
