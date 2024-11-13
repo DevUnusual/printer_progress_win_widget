@@ -5,6 +5,8 @@ from pystray import Icon, MenuItem, Menu
 from PIL import Image, ImageDraw, ImageFont
 
 delayTime = 20
+estimativa = -1
+progress_percentage = -1
 
 # Configuração do logger para depuração
 logging.basicConfig(
@@ -16,7 +18,28 @@ logging.basicConfig(
 def main():
     # URL da API para obter o progresso porta 4409, nao sei se funciona no fluid, possivelmente sim
     API_URL = "http://192.168.31.92:4409/printer/objects/query?virtual_sdcard=progress"
+    API_TIMEOBJ = "http://192.168.31.92:4409/printer/objects/query?print_stats=print_duration"
     stop_requested = False  # Variável para controlar o loop
+
+    def estimativa_tempo():
+        global estimativa
+        global progress
+        try:
+            #time.sleep(5)
+            # Faz a requisição para obter o progresso da API
+            logging.info("Realizando requisição para a API.")
+            response = requests.get(API_TIMEOBJ)
+            response.close()
+            response.raise_for_status()
+            data = response.json()
+            logging.debug(f"Resposta da API: {data}")
+
+            # Extrai o valor de progresso da resposta
+            timing = data.get("result", {}).get("status", {}).get("print_stats", {}).get("print_duration", 0)
+            estimativa = timing/progress_percentage
+            logging.info(f"Tempo Restante: {estimativa}min")
+        except requests.RequestException as e:
+            logging.error(f"Erro ao fazer a requisição para a API: {e}")
 
     # Define a função para encerrar o loop
     def stop_icon(icon, item):
@@ -38,11 +61,13 @@ def main():
     logging.info("Ícone da impressora iniciado na bandeja do sistema.")
 
     while not stop_requested:
+        global progress_percentage
         logging.info("Início da atualização de status de impressão.")
         try:
             # Faz a requisição para obter o progresso da API
             logging.info("Realizando requisição para a API.")
             response = requests.get(API_URL)
+            response.close()
             response.raise_for_status()
             data = response.json()
             logging.debug(f"Resposta da API: {data}")
@@ -82,9 +107,10 @@ def main():
             icon.icon = progress_image
             icon.menu = Menu(
                 MenuItem(f"Progresso: {progress_percentage}%", None, enabled=False),
+                MenuItem(f"Tempo Restante: {estimativa//60}h e {estimativa%60 : .0f}min", estimativa_tempo() , enabled=False),
                 MenuItem("Sair", stop_icon)
             )
-            icon.title = f"Progresso: {progress_percentage}%"  # Atualiza o tooltip com o progresso atual
+            icon.title = f"Progresso: {progress_percentage}% estimativa: {time.strftime("%d/%m %H:%M",time.localtime(time.time() + estimativa*60))}"  # Atualiza o tooltip com o progresso atual
             logging.info(f"Ícone atualizado com progresso de {progress_percentage}%")
             
         except requests.RequestException as e:
