@@ -4,9 +4,13 @@ import logging
 from pystray import Icon, MenuItem, Menu
 from PIL import Image, ImageDraw, ImageFont
 
-delayTime = 20
-estimativa = -1
-progress_percentage = -1
+# Definindo variáveis globais
+DELAY_TIME = 20
+PROGRESS_PERCENTAGE = -1
+ESTIMATIVA = -1
+GCODE_NAME = "N/A"
+TEMPO_TOTAL = -1
+STOP_GET_NAME = False
 
 # Configuração do logger para depuração
 logging.basicConfig(
@@ -15,34 +19,64 @@ logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s"
 )
 
+API_URL = "http://192.168.31.92:4409/printer/objects/query?print_stats&virtual_sdcard=filename,print_duration,progress"
+
+
 def main():
-    # URL da API para obter o progresso porta 4409, nao sei se funciona no fluid, possivelmente sim
-    API_URL = "http://192.168.31.92:4409/printer/objects/query?virtual_sdcard=progress"
-    API_TIMEOBJ = "http://192.168.31.92:4409/printer/objects/query?print_stats=print_duration"
     stop_requested = False  # Variável para controlar o loop
 
-    def estimativa_tempo():
-        global estimativa
-        global progress
+    def get_metadata():
+        global TEMPO_TOTAL
         try:
-            #time.sleep(5)
-            # Faz a requisição para obter o progresso da API
-            logging.info("Realizando requisição para a API.")
-            response = requests.get(API_TIMEOBJ)
-            response.close()
+            response = requests.get(f"http://192.168.31.92:4409/server/files/metadata?filename={GCODE_NAME}")
             response.raise_for_status()
             data = response.json()
-            logging.debug(f"Resposta da API: {data}")
-
-            # Extrai o valor de progresso da resposta
-            timing = data.get("result", {}).get("status", {}).get("print_stats", {}).get("print_duration", 0)
-            estimativa = timing/progress_percentage
-            logging.info(f"Tempo Restante: {estimativa}min")
+            TEMPO_TOTAL = data.get("result", {}).get("estimated_time", 0)
+            logging.info(f"Nome do arquivo: {GCODE_NAME} tempo estimado {TEMPO_TOTAL}")
         except requests.RequestException as e:
             logging.error(f"Erro ao fazer a requisição para a API: {e}")
 
-    # Define a função para encerrar o loop
-    def stop_icon(icon, item):
+    def process_response(data):
+        global GCODE_NAME, TEMPO_TOTAL, PROGRESS_PERCENTAGE, ESTIMATIVA
+        print_stats = data.get("result", {}).get("status", {}).get("print_stats", {})
+        virtual_sdcard = data.get("result", {}).get("status", {}).get("virtual_sdcard", {})
+
+        GCODE_NAME = print_stats.get("filename", "N/A")
+        print_duration = print_stats.get("print_duration", 0)
+        PROGRESS_PERCENTAGE = int(virtual_sdcard.get("progress", 0) * 100)
+
+        if TEMPO_TOTAL == -1 and GCODE_NAME != "N/A":
+            get_metadata()
+        else:
+            ESTIMATIVA = TEMPO_TOTAL - print_duration
+            logging.info(f"Tempo Restante: {ESTIMATIVA // 60 // 60}h e {(ESTIMATIVA // 60) % 60}min , estimativa = {ESTIMATIVA}")
+
+    def update_icon(icon):
+        # Cria um novo ícone com o valor da porcentagem no centro
+        progress_image = Image.new("RGB", (64, 64), "white")
+        draw = ImageDraw.Draw(progress_image)
+
+        try:
+            font = ImageFont.truetype("arial.ttf", 48)
+        except IOError:
+            font = ImageFont.load_default()
+
+        text = "OK" if PROGRESS_PERCENTAGE == 100 else ("EPT" if PROGRESS_PERCENTAGE == 0 else f"{PROGRESS_PERCENTAGE}")
+        text_bbox = draw.textbbox((0, 0), text, font=font)
+        text_x = (64 - (text_bbox[2] - text_bbox[0])) // 2
+        text_y = (64 - (text_bbox[3] - text_bbox[1])) // 2
+        draw.text((text_x, text_y), text, fill="black", font=font)
+
+        # Atualiza o ícone, o menu e o título com o novo progresso
+        icon.icon = progress_image
+        icon.menu = Menu(
+            MenuItem(f"Progresso: {PROGRESS_PERCENTAGE}%", None, enabled=False),
+            MenuItem(f"Tempo Restante: {ESTIMATIVA // 60 // 60}h e {(ESTIMATIVA // 60) % 60}min", None, enabled=False),
+            MenuItem("Sair", lambda icon, item: stop_icon(icon))
+        )
+        icon.title = f"Progresso: {PROGRESS_PERCENTAGE}% finaliza: {time.strftime('%d/%m %H:%M', time.localtime(time.time() + ESTIMATIVA))}"
+
+    def stop_icon(icon):
         nonlocal stop_requested
         stop_requested = True
         icon.stop()
@@ -53,7 +87,7 @@ def main():
     icon.icon = Image.new("RGB", (64, 64), "white")  # Ícone inicial em branco
     icon.menu = Menu(
         MenuItem("Progresso: 0%", None, enabled=False),
-        MenuItem("Sair", stop_icon)
+        MenuItem("Sair", lambda icon, item: stop_icon(icon))
     )
     icon.title = "Progresso: 0%"  # Define o texto inicial do tooltip
 
@@ -61,64 +95,21 @@ def main():
     logging.info("Ícone da impressora iniciado na bandeja do sistema.")
 
     while not stop_requested:
-        global progress_percentage
         logging.info("Início da atualização de status de impressão.")
         try:
             # Faz a requisição para obter o progresso da API
-            logging.info("Realizando requisição para a API.")
             response = requests.get(API_URL)
-            response.close()
             response.raise_for_status()
             data = response.json()
-            logging.debug(f"Resposta da API: {data}")
-
-            # Extrai o valor de progresso da resposta
-            progress = data.get("result", {}).get("status", {}).get("virtual_sdcard", {}).get("progress", 0)
-            progress_percentage = int(progress * 100)
-            logging.info(f"Progresso obtido: {progress_percentage}%")
-
-            # Cria um novo ícone com o valor da porcentagem no centro
-            progress_image = Image.new("RGB", (64, 64), "white")  # Fundo branco
-            draw = ImageDraw.Draw(progress_image)
-            
-            try:
-                font = ImageFont.truetype("arial.ttf", 48)  # Tamanho da fonte aumentado para 48
-            except IOError:
-                font = ImageFont.load_default()
-
-            # Desenha o texto de progresso centralizado
-            if progress_percentage == 100:
-              text = "OK"
-              delayTime = 300
-            elif progress_percentage == 0:
-              text = "EPT"
-              delayTime = 300
-            else:
-              text = f"{progress_percentage}"
-              delayTime = 20
-            text_bbox = draw.textbbox((0, 0), text, font=font)
-            text_width = text_bbox[2] - text_bbox[0]
-            text_height = text_bbox[3] - text_bbox[1]
-            text_x = (64 - text_width) // 2
-            text_y = (64 - text_height) // 2
-            draw.text((text_x, text_y), text, fill="black", font=font)
-
-            # Atualiza o ícone, o menu e o título com o novo progresso
-            icon.icon = progress_image
-            icon.menu = Menu(
-                MenuItem(f"Progresso: {progress_percentage}%", None, enabled=False),
-                MenuItem(f"Tempo Restante: {estimativa//60}h e {estimativa%60 : .0f}min", estimativa_tempo() , enabled=False),
-                MenuItem("Sair", stop_icon)
-            )
-            icon.title = f"Progresso: {progress_percentage}% estimativa: {time.strftime("%d/%m %H:%M",time.localtime(time.time() + estimativa*60))}"  # Atualiza o tooltip com o progresso atual
-            logging.info(f"Ícone atualizado com progresso de {progress_percentage}%")
-            
+            process_response(data)
+            update_icon(icon)
+            logging.info(f"Ícone atualizado com progresso de {PROGRESS_PERCENTAGE}%")
         except requests.RequestException as e:
             logging.error(f"Erro ao fazer a requisição para a API: {e}")
         except Exception as e:
             logging.error(f"Erro inesperado: {e}")
 
-        time.sleep(delayTime)  # Aguarda 10 segundos antes da próxima atualização
+        time.sleep(DELAY_TIME)  # Aguarda antes da próxima atualização
         logging.info("Aguardando próxima atualização...")
 
 if __name__ == "__main__":
