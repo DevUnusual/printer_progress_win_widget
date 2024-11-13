@@ -4,6 +4,8 @@ import logging
 from pystray import Icon, MenuItem, Menu
 from PIL import Image, ImageDraw, ImageFont
 
+delayTime = 20
+
 # Configuração do logger para depuração
 logging.basicConfig(
     filename="widget_debug.log",
@@ -62,8 +64,13 @@ def main():
             # Desenha o texto de progresso centralizado
             if progress_percentage == 100:
               text = "OK"
+              delayTime = 300
+            elif progress_percentage == 0:
+              text = "EPT"
+              delayTime = 300
             else:
               text = f"{progress_percentage}"
+              delayTime = 20
             text_bbox = draw.textbbox((0, 0), text, font=font)
             text_width = text_bbox[2] - text_bbox[0]
             text_height = text_bbox[3] - text_bbox[1]
@@ -85,7 +92,7 @@ def main():
         except Exception as e:
             logging.error(f"Erro inesperado: {e}")
 
-        time.sleep(10)  # Aguarda 10 segundos antes da próxima atualização
+        time.sleep(delayTime)  # Aguarda 10 segundos antes da próxima atualização
         logging.info("Aguardando próxima atualização...")
 
 if __name__ == "__main__":

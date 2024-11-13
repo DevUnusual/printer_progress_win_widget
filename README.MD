@@ -33,7 +33,19 @@ python monitor.py
 python3 monitor.py
 ```
 
-## Inicializar junto ao sistema:
+## Inicializar junto ao sistema (buildando um executavel - windows verificado):
+### Windows
+-- Instalar o pyinstaller:
+"--onefile" para gerar um único arquivo executável.
+"--noconsole" para não abrir um console ao executar o arquivo.
+```bash
+pip install pyinstaller
+pyinstaller --onefile --noconsole monitor.py
+```
+feito isso vai ser gerado um executável na pasta "dist" com o nome "monitor.exe"
+abrir o task scheduler e criar uma nova tarefa com o trigger "at startup" e na aba "actions" adicionar o caminho do executável gerado.
+
+## Inicializar junto ao sistema (Só com script [não consegui]):
 ### Windows:
 Abra o Agendador de Tarefas | Task schedule:
 - No menu Iniciar, procure por "Agendador de Tarefas" e abra-o.
