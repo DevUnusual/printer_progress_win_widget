@@ -19,6 +19,9 @@ logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s"
 )
 
+def status_var_log():
+    logging.info(f"Variáveis globais: PROGRESS_PERCENTAGE={PROGRESS_PERCENTAGE}, ESTIMATIVA={ESTIMATIVA}, GCODE_NAME={GCODE_NAME}, TEMPO_TOTAL={TEMPO_TOTAL}")
+
 API_URL = "http://192.168.31.92:4409/printer/objects/query?print_stats&virtual_sdcard=filename,print_duration,progress"
 
 
@@ -110,6 +113,7 @@ def main():
             logging.error(f"Erro inesperado: {e}")
 
         time.sleep(DELAY_TIME)  # Aguarda antes da próxima atualização
+        status_var_log()
         logging.info("Aguardando próxima atualização...")
 
 if __name__ == "__main__":
